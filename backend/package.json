@@ -3,22 +3,45 @@
   "version": "1.0.0",
   "description": "Smart contracts for IoT data storage on blockchain",
   "main": "index.js",
+  "type": "module",
   "scripts": {
     "compile": "hardhat compile",
+    "clean": "hardhat clean",
     "test": "hardhat test",
+    "coverage": "hardhat coverage",
+    "gas-report": "REPORT_GAS=true hardhat test",
     "deploy:moonbase": "hardhat run scripts/deploy.ts --network moonbase",
+    "deploy:moonbeam": "hardhat run scripts/deploy.ts --network moonbeam",
     "deploy:local": "hardhat run scripts/deploy.ts --network localhost",
-    "node": "hardhat node"
+    "node": "hardhat node",
+    "verify": "hardhat verify",
+    "typechain": "hardhat typechain"
   },
   "dependencies": {
-    "dotenv": "^16.3.1"
+    "@iconify/svelte": "^4.2.0",
+    "@types/keccak": "^3.0.5",
+    "dotenv": "16.4.7",
+    "keccak256": "^1.0.6",
+    "merkletreejs": "^0.5.1"
   },
   "devDependencies": {
+    "@nomicfoundation/hardhat-chai-matchers": "2.0.8",
+    "@nomicfoundation/hardhat-ethers": "3.0.8",
+    "@nomicfoundation/hardhat-network-helpers": "1.0.12",
     "@nomicfoundation/hardhat-toolbox": "5.0.0",
+    "@nomicfoundation/hardhat-verify": "2.0.13",
+    "@typechain/ethers-v6": "0.5.1",
+    "@typechain/hardhat": "9.1.0",
+    "@types/chai": "5.2.0",
+    "@types/mocha": "10.0.10",
     "@types/node": "22.13.10",
-    "ethers": "6.13.5",
-    "hardhat": "^2.19.1",
-    "ts-node": "^10.9.1",
-    "typescript": "^5.3.2"
+    "chai": "5.2.0",
+    "ethers": "^6.13.5",
+    "hardhat": "2.22.19",
+    "hardhat-gas-reporter": "2.2.2",
+    "solidity-coverage": "0.8.14",
+    "ts-node": "10.9.2",
+    "typechain": "8.3.2",
+    "typescript": "5.8.2"
   }
 }
