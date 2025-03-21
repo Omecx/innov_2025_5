@@ -1,7 +1,7 @@
 import { writable, get } from 'svelte/store';
 import { ApiPromise, WsProvider } from '@polkadot/api';
 import { ethers } from 'ethers';
-import type { BlockchainStore, FormattedSensorData, NetworkConfig } from '$lib/types';
+import type { BlockchainStore, FormattedSensorData, NetworkConfig, DataStoredEvent, DataBatch } from '$lib/types';
 import { NotificationType, UserRole } from '$lib/types';
 import contractAbi from '$lib/blockchain/contract-abi.json';
 import contractAddressFile from '$lib/blockchain/contract-address.json';
@@ -401,18 +401,18 @@ export function listenForDataEvents(callback: (event: any) => void) {
 export async function grantDeviceRole(address: string): Promise<boolean> {
   try {
     const state = get(blockchainStore);
+    if (!state.contract || !state.signer) {
+      throw new Error('Contract or signer not available');
+    }
     
-    if (!state.contract) throw new Error('Contract not connected');
-    if (!state.userRoles.includes(UserRole.ADMIN)) throw new Error('Must be admin to grant roles');
-    
-    const tx = await state.contract.grantDeviceRole(address);
+    const tx = await state.contract.grantRole(DEVICE_ROLE, address);
     await tx.wait();
     
     addNotification(NotificationType.SUCCESS, `Device role granted to ${address}`);
     return true;
   } catch (error) {
-    console.error("Error granting device role:", error);
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error granting role';
+    console.error('Error granting device role:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Failed to grant device role';
     addNotification(NotificationType.ERROR, errorMessage);
     return false;
   }
@@ -422,18 +422,18 @@ export async function grantDeviceRole(address: string): Promise<boolean> {
 export async function grantAnalystRole(address: string): Promise<boolean> {
   try {
     const state = get(blockchainStore);
+    if (!state.contract || !state.signer) {
+      throw new Error('Contract or signer not available');
+    }
     
-    if (!state.contract) throw new Error('Contract not connected');
-    if (!state.userRoles.includes(UserRole.ADMIN)) throw new Error('Must be admin to grant roles');
-    
-    const tx = await state.contract.grantAnalystRole(address);
+    const tx = await state.contract.grantRole(ANALYST_ROLE, address);
     await tx.wait();
     
     addNotification(NotificationType.SUCCESS, `Analyst role granted to ${address}`);
     return true;
   } catch (error) {
-    console.error("Error granting analyst role:", error);
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error granting role';
+    console.error('Error granting analyst role:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Failed to grant analyst role';
     addNotification(NotificationType.ERROR, errorMessage);
     return false;
   }
@@ -443,26 +443,23 @@ export async function grantAnalystRole(address: string): Promise<boolean> {
 export async function revokeRole(role: string, address: string): Promise<boolean> {
   try {
     const state = get(blockchainStore);
+    if (!state.contract || !state.signer) {
+      throw new Error('Contract or signer not available');
+    }
     
-    if (!state.contract) throw new Error('Contract not connected');
-    if (!state.userRoles.includes(UserRole.ADMIN)) throw new Error('Must be admin to revoke roles');
-    
-    let roleHash = '';
-    
-    if (role === UserRole.ADMIN) roleHash = ADMIN_ROLE;
-    if (role === UserRole.DEVICE) roleHash = DEVICE_ROLE;
-    if (role === UserRole.ANALYST) roleHash = ANALYST_ROLE;
-    
-    if (!roleHash) throw new Error('Invalid role');
-    
-    const tx = await state.contract.revokeRole(roleHash, address);
+    const tx = await state.contract.revokeRole(role, address);
     await tx.wait();
     
-    addNotification(NotificationType.SUCCESS, `${role} role revoked from ${address}`);
+    let roleName = 'Unknown';
+    if (role === ADMIN_ROLE) roleName = 'Admin';
+    if (role === DEVICE_ROLE) roleName = 'Device';
+    if (role === ANALYST_ROLE) roleName = 'Analyst';
+    
+    addNotification(NotificationType.SUCCESS, `${roleName} role revoked from ${address}`);
     return true;
   } catch (error) {
-    console.error("Error revoking role:", error);
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error revoking role';
+    console.error('Error revoking role:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Failed to revoke role';
     addNotification(NotificationType.ERROR, errorMessage);
     return false;
   }
@@ -477,27 +474,29 @@ export async function createBatch(
 ): Promise<string | null> {
   try {
     const state = get(blockchainStore);
+    if (!state.contract || !state.signer) {
+      throw new Error('Contract or signer not available');
+    }
     
-    if (!state.contract) throw new Error('Contract not connected');
-    if (!state.userRoles.includes(UserRole.ADMIN)) throw new Error('Must be admin to create batches');
-    
-    const tx = await state.contract.createBatch(
-      fromIndex,
-      toIndex,
-      merkleRoot,
-      description
-    );
-    
+    const tx = await state.contract.createBatch(fromIndex, toIndex, merkleRoot, description);
     const receipt = await tx.wait();
     
-    // Extract batch ID from receipt
-    const batchId = receipt.logs[0].args[0];
+    // Get the batch ID from the event logs
+    const event = receipt.logs.find(
+      (log: any) => log.eventName === 'BatchCreated'
+    );
     
-    addNotification(NotificationType.SUCCESS, `Batch created with ID: ${batchId}`);
-    return batchId;
+    if (event && event.args) {
+      const batchId = event.args[0].toString();
+      addNotification(NotificationType.SUCCESS, `Batch created with ID: ${batchId}`);
+      return batchId;
+    }
+    
+    addNotification(NotificationType.SUCCESS, 'Batch created successfully');
+    return '0'; // Default batch ID if we couldn't extract it
   } catch (error) {
-    console.error("Error creating batch:", error);
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error creating batch';
+    console.error('Error creating batch:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Failed to create batch';
     addNotification(NotificationType.ERROR, errorMessage);
     return null;
   }
@@ -507,17 +506,17 @@ export async function createBatch(
 export async function getBatches(): Promise<DataBatch[]> {
   try {
     const state = get(blockchainStore);
-    
-    if (!state.contract) throw new Error('Contract not connected');
+    if (!state.contract) {
+      throw new Error('Contract not available');
+    }
     
     const batchCount = await state.contract.getBatchCount();
     const batches: DataBatch[] = [];
     
-    for (let i = 0; i < Number(batchCount); i++) {
-      const batch = await state.contract.getBatchByIndex(i);
-      
+    for (let i = 0; i < batchCount; i++) {
+      const batch = await state.contract.getBatch(i);
       batches.push({
-        batchId: batch.batchId,
+        batchId: i.toString(),
         merkleRoot: batch.merkleRoot,
         fromIndex: Number(batch.fromIndex),
         toIndex: Number(batch.toIndex),
@@ -528,143 +527,9 @@ export async function getBatches(): Promise<DataBatch[]> {
     
     return batches;
   } catch (error) {
-    console.error("Error getting batches:", error);
-    return [];
-  }
-}
-
-// Grant device role
-export async function grantDeviceRole(address: string): Promise<boolean> {
-  try {
-    const state = get(blockchainStore);
-    
-    if (!state.contract) throw new Error('Contract not connected');
-    if (!state.userRoles.includes(UserRole.ADMIN)) throw new Error('Must be admin to grant roles');
-    
-    const tx = await state.contract.grantDeviceRole(address);
-    await tx.wait();
-    
-    addNotification(NotificationType.SUCCESS, `Device role granted to ${address}`);
-    return true;
-  } catch (error) {
-    console.error("Error granting device role:", error);
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error granting role';
+    console.error('Error getting batches:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Failed to get batches';
     addNotification(NotificationType.ERROR, errorMessage);
-    return false;
-  }
-}
-
-// Grant analyst role
-export async function grantAnalystRole(address: string): Promise<boolean> {
-  try {
-    const state = get(blockchainStore);
-    
-    if (!state.contract) throw new Error('Contract not connected');
-    if (!state.userRoles.includes(UserRole.ADMIN)) throw new Error('Must be admin to grant roles');
-    
-    const tx = await state.contract.grantAnalystRole(address);
-    await tx.wait();
-    
-    addNotification(NotificationType.SUCCESS, `Analyst role granted to ${address}`);
-    return true;
-  } catch (error) {
-    console.error("Error granting analyst role:", error);
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error granting role';
-    addNotification(NotificationType.ERROR, errorMessage);
-    return false;
-  }
-}
-
-// Revoke role
-export async function revokeRole(role: string, address: string): Promise<boolean> {
-  try {
-    const state = get(blockchainStore);
-    
-    if (!state.contract) throw new Error('Contract not connected');
-    if (!state.userRoles.includes(UserRole.ADMIN)) throw new Error('Must be admin to revoke roles');
-    
-    let roleHash = '';
-    
-    if (role === UserRole.ADMIN) roleHash = ADMIN_ROLE;
-    if (role === UserRole.DEVICE) roleHash = DEVICE_ROLE;
-    if (role === UserRole.ANALYST) roleHash = ANALYST_ROLE;
-    
-    if (!roleHash) throw new Error('Invalid role');
-    
-    const tx = await state.contract.revokeRole(roleHash, address);
-    await tx.wait();
-    
-    addNotification(NotificationType.SUCCESS, `${role} role revoked from ${address}`);
-    return true;
-  } catch (error) {
-    console.error("Error revoking role:", error);
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error revoking role';
-    addNotification(NotificationType.ERROR, errorMessage);
-    return false;
-  }
-}
-
-// Create a new batch of records with Merkle proof
-export async function createBatch(
-  fromIndex: number,
-  toIndex: number,
-  merkleRoot: string,
-  description: string
-): Promise<string | null> {
-  try {
-    const state = get(blockchainStore);
-    
-    if (!state.contract) throw new Error('Contract not connected');
-    if (!state.userRoles.includes(UserRole.ADMIN)) throw new Error('Must be admin to create batches');
-    
-    const tx = await state.contract.createBatch(
-      fromIndex,
-      toIndex,
-      merkleRoot,
-      description
-    );
-    
-    const receipt = await tx.wait();
-    
-    // Extract batch ID from receipt
-    const batchId = receipt.logs[0].args[0];
-    
-    addNotification(NotificationType.SUCCESS, `Batch created with ID: ${batchId}`);
-    return batchId;
-  } catch (error) {
-    console.error("Error creating batch:", error);
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error creating batch';
-    addNotification(NotificationType.ERROR, errorMessage);
-    return null;
-  }
-}
-
-// Get all batches
-export async function getBatches(): Promise<DataBatch[]> {
-  try {
-    const state = get(blockchainStore);
-    
-    if (!state.contract) throw new Error('Contract not connected');
-    
-    const batchCount = await state.contract.getBatchCount();
-    const batches: DataBatch[] = [];
-    
-    for (let i = 0; i < Number(batchCount); i++) {
-      const batch = await state.contract.getBatchByIndex(i);
-      
-      batches.push({
-        batchId: batch.batchId,
-        merkleRoot: batch.merkleRoot,
-        fromIndex: Number(batch.fromIndex),
-        toIndex: Number(batch.toIndex),
-        timestamp: Number(batch.timestamp),
-        description: batch.description
-      });
-    }
-    
-    return batches;
-  } catch (error) {
-    console.error("Error getting batches:", error);
     return [];
   }
 }

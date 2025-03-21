@@ -3,23 +3,21 @@
   "version": "1.0.0",
   "description": "Smart contracts for IoT data storage on blockchain",
   "main": "index.js",
-  "type": "module",
+  "type": "commonjs",
   "scripts": {
     "compile": "hardhat compile",
     "clean": "hardhat clean",
     "test": "hardhat test",
     "coverage": "hardhat coverage",
     "gas-report": "REPORT_GAS=true hardhat test",
-    "deploy:moonbase": "hardhat run scripts/deploy.ts --network moonbase",
-    "deploy:moonbeam": "hardhat run scripts/deploy.ts --network moonbeam",
-    "deploy:local": "hardhat run scripts/deploy.ts --network localhost",
+    "deploy:moonbase": "hardhat ignition deploy ignition/modules/IoTData.js --network moonbase",
+    "deploy:moonbeam": "hardhat ignition deploy ignition/modules/IoTData.js --network moonbeam",
+    "deploy:local": "hardhat ignition deploy ignition/modules/IoTData.js --network localhost",
     "node": "hardhat node",
     "verify": "hardhat verify",
     "typechain": "hardhat typechain"
   },
   "dependencies": {
-    "@iconify/svelte": "^4.2.0",
-    "@types/keccak": "^3.0.5",
     "dotenv": "16.4.7",
     "keccak256": "^1.0.6",
     "merkletreejs": "^0.5.1"
@@ -27,6 +25,7 @@
   "devDependencies": {
     "@nomicfoundation/hardhat-chai-matchers": "2.0.8",
     "@nomicfoundation/hardhat-ethers": "3.0.8",
+    "@nomicfoundation/hardhat-ignition-ethers": "^0.13.0",
     "@nomicfoundation/hardhat-network-helpers": "1.0.12",
     "@nomicfoundation/hardhat-toolbox": "5.0.0",
     "@nomicfoundation/hardhat-verify": "2.0.13",

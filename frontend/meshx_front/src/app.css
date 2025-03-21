@@ -1,7 +1,7 @@
-@import 'tailwindcss';
+@import '@tailwindcss/vite/core';
 
-@import '@skeletonlabs/skeleton';
-@import '@skeletonlabs/skeleton/optional/presets';
-@import '@skeletonlabs/skeleton/themes/cerberus';
+/* Skeleton v3 imports */
+@import '@skeletonlabs/skeleton-svelte/dist/all.css';
+@import '@skeletonlabs/skeleton-svelte/dist/theme.css';
 
-@source '../node_modules/@skeletonlabs/skeleton-svelte/dist';
+/* Custom styles go below */
