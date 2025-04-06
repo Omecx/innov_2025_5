@@ -10,6 +10,7 @@ coverage.json
 
 # Node dependencies
 node_modules/
+./node_modules/
 
 # Build outputs
 dist/
